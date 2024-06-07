@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import { google } from 'googleapis';
 import nodemailer from 'nodemailer';
+import axios from 'axios';
 
 dotenv.config();
 
@@ -33,9 +34,19 @@ const aiService = {
 
     return chatCompletion.choices[0].message;
   },
-  // sendEmail: async () => {
-
-  // }
+  evaluateNews: async (title) => {
+    try {
+      const chatCompletion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [{ "role": "user", "content": `Evaluate if this header is bullish or bearish for crypto "${title}". Provide only one word: Bullish or Bearish.` }],
+      });
+      console.log(chatCompletion.choices[0].message);
+      return chatCompletion.choices[0].message.content;
+    } catch (error) {
+      console.error("Error evaluating news:", error);
+      res.status(500).send("An error occurred while evaluating the news.");
+    }
+  }
 };
 
 app.get('/', (req, res) => {
@@ -101,6 +112,31 @@ app.get('/generateEmail', async (req, res) => {
   } catch (error) {
     console.error("Error generating email:", error);
     res.status(500).send("An error occurred while generating the email.");
+  }
+});
+
+app.get('/getCryptoNews', async (req, res) => {
+  try {
+    const response = await axios.get('https://cryptopanic.com/api/v1/posts/?auth_token=b6de5c1cb7094cce184670e40540ae5110313327');
+
+    const data = response.data;
+
+    if (Array.isArray(data.results)) {
+      const transformedResults = [];
+      for (let i = 0; i < 10 && i < data.results.length; i++) {
+        transformedResults.push({
+          title: data.results[i].title,
+          type: await aiService.evaluateNews(data.results[i].title)
+        });
+      }
+
+      res.json(transformedResults);
+    } else {
+      console.log('No results found.');
+    }
+  } catch (error) {
+    console.error("Error returning crypto news:", error);
+    res.status(500).send("An error occurred while generating the emailreturning crypto news.");
   }
 });
 
