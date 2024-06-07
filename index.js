@@ -8,7 +8,7 @@ const app = express()
 const port = process.env.PORT || 3000
 
 const openai = new OpenAI({
-  apiKey: process.env.API_KEY
+  apiKey: process.env.API_KEY_1 + process.env.API_KEY_2
 });
 
 const aiService = {
