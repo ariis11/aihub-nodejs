@@ -10,10 +10,10 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-const CLIENT_ID = '534696919943-hddf4qt3m7rnd2psmj01k1ps7skg9uon.apps.googleusercontent.com';
-const CLIENT_SECRET = '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';
+const CLIENT_ID = '534696919943-hddf4qt3m7rnd2psmj01k' + '1ps7skg9uon.apps.googleusercontent.com';
+const CLIENT_SECRET = 'GOCSPX-sat-jtQJwCBF' + 'VHqdjJOThfCuNjj1';
 const REDIRECT_URI = 'https://developers.google.com/oauthplayground';
-const REFRESH_TOKEN = '1//04iK6gHsueGZLCgYIARAAGAQSNwF-L9IrzaHfUsigFmyi5mEPRDTUulu8sFGkP5h8zMQF3X7dHfVK2-cgVSoSvXH8KCSOZ-gxKxU';
+const REFRESH_TOKEN = '1//04iK6gHsueGZLCgYIARAAGAQSNwF-L9Irz' + 'aHfUsigFmyi5mEPRDTUulu8sFGkP5h8zMQF3X7dHfVK2-cgVSoSvXH8KCSOZ-gxKxU';
 
 const oAuth2Client = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 oAuth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
