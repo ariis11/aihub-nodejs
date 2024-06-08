@@ -5,6 +5,8 @@ import cors from 'cors';
 import { google } from 'googleapis';
 import nodemailer from 'nodemailer';
 import axios from 'axios';
+import fetch from 'node-fetch';
+import moment from 'moment';
 
 dotenv.config();
 
@@ -26,35 +28,21 @@ const openai = new OpenAI({
 });
 
 const aiService = {
-  askQuestion: async () => {
-    const chatCompletion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{ "role": "user", "content": "Hello!" }],
-    });
+  generateEmail: async (req) => {
+    const message = req.query.message;
 
-    return chatCompletion.choices[0].message;
-  },
-  evaluateNews: async (title) => {
-    try {
+    if (message) {
       const chatCompletion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
-        messages: [{ "role": "user", "content": `Evaluate if this header is bullish or bearish for crypto "${title}". Provide only one word: Bullish or Bearish.` }],
+        messages: [{ "role": "user", "content": message }],
       });
-      console.log(chatCompletion.choices[0].message);
-      return chatCompletion.choices[0].message.content;
-    } catch (error) {
-      console.error("Error evaluating news:", error);
-      res.status(500).send("An error occurred while evaluating the news.");
+
+      return chatCompletion.choices[0].message;
+    } else {
+      return null;
     }
-  }
-};
-
-app.get('/', (req, res) => {
-  res.send('Hello World!')
-});
-
-app.get('/sendEmail', async (req, res) => {
-  try {
+  },
+  sendEmail: async (req) => {
     const recipient = req.query.recipient;
     const subject = req.query.subject;
     const message = req.query.message;
@@ -86,6 +74,80 @@ app.get('/sendEmail', async (req, res) => {
 
       const result = await transport.sendMail(mailOptions);
 
+      return result;
+    } else {
+      return null;
+    }
+  },
+  evaluateNews: async (title) => {
+    try {
+      const chatCompletion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [{ "role": "user", "content": `Evaluate if this header is bullish or bearish for crypto "${title}". Provide only one word: Bullish or Bearish.` }],
+      });
+      console.log(chatCompletion.choices[0].message);
+      return chatCompletion.choices[0].message.content;
+    } catch (error) {
+      console.error("Error evaluating news:", error);
+      res.status(500).send("An error occurred while evaluating the news.");
+    }
+  },
+  getCryptoNews: async () => {
+    const response = await axios.get('https://cryptopanic.com/api/v1/posts/?auth_token=b6de5c1cb7094cce184670e40540ae5110313327');
+
+    const data = response.data;
+
+    if (Array.isArray(data.results)) {
+      const transformedResults = [];
+      for (let i = 0; i < 10 && i < data.results.length; i++) {
+        transformedResults.push({
+          title: data.results[i].title,
+          type: await aiService.evaluateNews(data.results[i].title),
+          url: data.results[i].url
+        });
+      }
+
+      return transformedResults;
+    } else {
+      return null;
+    }
+  },
+  generateCryptoNewsAnswer: async (req) => {
+    const message = req.query.message;
+
+    if (message) {
+      const chatCompletion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ "role": "user", "content": message }],
+      });
+
+      return chatCompletion.choices[0].message;
+    } else {
+      return null;
+    }
+  },
+  getCoinHistoricData: async (id, days) => {
+    const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`;
+    const options = {
+      method: 'GET',
+      headers: { accept: 'application/json', 'x-cg-demo-api-key': 'CG-i4YdQ2qSrbWPsc97MV2pt6Sx' }
+    };
+
+    return fetch(url, options)
+      .then(res => res.json())
+      .catch(() => null);
+  }
+};
+
+app.get('/', (req, res) => {
+  res.send('Hello World!')
+});
+
+app.get('/sendEmail', async (req, res) => {
+  try {
+    const response = await aiService.sendEmail(req);
+
+    if (response) {
       res.send(result);
     } else {
       res.status(400).send('Recipient, subject or message parameter is missing');
@@ -98,14 +160,10 @@ app.get('/sendEmail', async (req, res) => {
 
 app.get('/generateEmail', async (req, res) => {
   try {
-    const message = req.query.message;
-    if (message) {
-      const chatCompletion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [{ "role": "user", "content": message }],
-      });
-      console.log(chatCompletion.choices[0].message);
-      res.send(chatCompletion.choices[0].message);
+    const emailBody = await aiService.generateEmail(req);
+
+    if (emailBody) {
+      res.send(emailBody);
     } else {
       res.status(400).send('Message parameter is required');
     }
@@ -115,28 +173,69 @@ app.get('/generateEmail', async (req, res) => {
   }
 });
 
+app.get('/generateCryptoNewsAnswer', async (req, res) => {
+  try {
+    const answer = await aiService.generateCryptoNewsAnswer(req);
+
+    if (answer) {
+      res.send(answer);
+    } else {
+      res.status(400).send('Message parameter is required');
+    }
+  } catch (error) {
+    console.error("Error generating answer for crypto news:", error);
+    res.status(500).send("An error occurred while generating answer for crypto news.");
+  }
+});
+
 app.get('/getCryptoNews', async (req, res) => {
   try {
-    const response = await axios.get('https://cryptopanic.com/api/v1/posts/?auth_token=b6de5c1cb7094cce184670e40540ae5110313327');
+    const cryptoNews = await aiService.getCryptoNews();
 
-    const data = response.data;
-
-    if (Array.isArray(data.results)) {
-      const transformedResults = [];
-      for (let i = 0; i < 10 && i < data.results.length; i++) {
-        transformedResults.push({
-          title: data.results[i].title,
-          type: await aiService.evaluateNews(data.results[i].title)
-        });
-      }
-
-      res.json(transformedResults);
+    if (cryptoNews) {
+      res.json(cryptoNews);
     } else {
-      console.log('No results found.');
+      console.error("No crypto news found.:", error);
+      res.status(500).send("An error occurred while returning crypto news.");
     }
   } catch (error) {
     console.error("Error returning crypto news:", error);
-    res.status(500).send("An error occurred while generating the emailreturning crypto news.");
+    res.status(500).send("An error occurred while returning crypto news.");
+  }
+});
+
+app.get('/getCoinHistoricData', async (req, res) => {
+  const id = req.query.id;
+  const days = req.query.days;
+
+  if (!days || !id) {
+    res.status(400).send('Message parameter is required');
+  }
+
+  try {
+    const coinData = await aiService.getCoinHistoricData(id, days);
+
+    if (coinData) {
+      const transformArray = (arr) => {
+        const filteredArr = arr.filter((_, index) => index % 12 === 0);
+        return filteredArr.map(([timestamp, value]) => ({
+          time: Date.parse(moment(new Date(timestamp)).format("YYYY-MM-DD HH:mm")) / 1000,
+          value: value
+        }));
+      };
+
+      res.json({
+        prices: transformArray(coinData.prices),
+        market_caps: transformArray(coinData.market_caps),
+        total_volumes: transformArray(coinData.total_volumes)
+      });
+    } else {
+      console.error("No coin records found.:", error);
+      res.status(500).send("An error occurred while returning coin records.");
+    }
+  } catch (error) {
+    console.error("Error returning coin records:", error);
+    res.status(500).send("An error occurred while returning coin records.");
   }
 });
 
