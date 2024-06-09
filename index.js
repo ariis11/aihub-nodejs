@@ -93,7 +93,7 @@ const aiService = {
     }
   },
   getCryptoNews: async () => {
-    const response = await axios.get('https://cryptopanic.com/api/v1/posts/?auth_token=b6de5c1cb7094cce184670e40540ae5110313327');
+    const response = await axios.get('https://cryptopanic.com/api/v1/posts/?auth_token=b6de5c1cb7094cce184670e40540ae5110313327&currencies=TON');
 
     const data = response.data;
 
