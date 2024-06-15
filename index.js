@@ -136,6 +136,17 @@ const aiService = {
     return fetch(url, options)
       .then(res => res.json())
       .catch(() => null);
+  },
+  getCoinDayData: async () => {
+    const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd`;
+    const options = {
+      method: 'GET',
+      headers: { accept: 'application/json', 'x-cg-demo-api-key': 'CG-i4YdQ2qSrbWPsc97MV2pt6Sx' }
+    };
+
+    return fetch(url, options)
+      .then(res => res.json())
+      .catch(() => null);
   }
 };
 
@@ -229,6 +240,47 @@ app.get('/getCoinHistoricData', async (req, res) => {
         market_caps: transformArray(coinData.market_caps),
         total_volumes: transformArray(coinData.total_volumes)
       });
+    } else {
+      console.error("No coin records found.:", error);
+      res.status(500).send("An error occurred while returning coin records.");
+    }
+  } catch (error) {
+    console.error("Error returning coin records:", error);
+    res.status(500).send("An error occurred while returning coin records.");
+  }
+});
+
+app.get('/getCoinDayData', async (req, res) => {
+  try {
+    const coinData = await aiService.getCoinDayData();
+
+    console.log('coinData: ' + JSON.stringify(coinData));
+
+    if (coinData) {
+      const neededCoins = [ "btc", "eth", "sol", "ton" ];
+      const response = {
+        btc: null,
+        ath: null,
+        sol: null,
+        ton: null
+      };
+      
+      coinData.forEach(coin => {
+        const id = coin.symbol;
+        console.log("id: " + id);
+        if (neededCoins.includes(id)) {
+          console.log("yes");
+          console.log("coin.current_price: " + coin.current_price);
+          console.log("coin.price_change_percentage_24h: " + coin.price_change_percentage_24h);
+          response[id] = {
+            price: coin.current_price,
+            change: coin.price_change_percentage_24h
+          };
+        }
+      });
+
+      console.log('coinData: ' + JSON.stringify(response));
+      res.json(response);
     } else {
       console.error("No coin records found.:", error);
       res.status(500).send("An error occurred while returning coin records.");
